@@ -1,0 +1,334 @@
+---
+title: "International Comparison"
+author: "Magnús Árni Skúlason og Kári S Friðriksson"
+output: word_document
+---
+
+
+```{r setup, include=FALSE, echo = FALSE}
+# Source: http://www.gemconsortium.org/data/key-nes
+# Source: http://www.gemconsortium.org/data/key-aps
+library(tidyverse)
+library(magrittr)
+
+
+require(ggplot2)
+require(extrafont)
+require(scales)
+
+# loadfonts(device = "win")
+# font_import(pattern='GARA')
+
+
+intellecon_pal_discrete <- c(
+    "#6E1704", # Vínrauður
+    "#E69F00",  # Gull,
+    "#999999",   # Grár)
+    "#56B4E9",  # Ljósblár
+    "#77AB43"
+) 
+
+scale_fill_intellecon <- list(scale_fill_manual(values = intellecon_pal_discrete))
+
+
+vertical_x_label <- list(theme(axis.text.x = element_text(angle = 90, hjust = 0.8, vjust = 1)))
+y_format_percentage <- scale_y_continuous(labels = scales::percent)
+
+point <- scales::format_format(big.mark = ".", decimal.mark = ",", scientific = FALSE)
+
+y_format_number <- scale_y_continuous(labels = point)
+
+# kr <-  scales::format_format(big.mark = ".", decimal.mark = ",", scientific = FALSE)
+
+y_format_kr <- scale_y_continuous(labels = dollar_format(prefix = "",
+                                                         suffix = " kr.",
+                                                         largest_with_cents = 0, 
+                                                         big.mark = ".",
+                                                         decimal.mark = ",",
+                                                         negative_parens = FALSE))
+
+# Have vertical lines
+coord_flip_lines <- theme(          panel.grid.major.y = element_blank(),
+                                    panel.grid.major.x = element_line(colour = "gray70"),
+                                    panel.grid.minor.x = element_blank())
+
+
+theme_intellecon <- function(){
+    require(extrafont)
+    col_title <- "#6E1704"
+    theme_grey() %+replace% 
+        theme(legend.direction = "horizontal",
+              legend.position = "bottom",
+              legend.background = element_rect(color = NA, fill = NA),
+              panel.background = element_rect(fill = NA, colour = NA), 
+              panel.border = element_rect(fill = NA, colour = NA), 
+              panel.grid.major.y = element_line(colour = "white"),
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor.x = element_blank(), 
+              panel.spacing = unit(0, "lines"),
+              axis.ticks = element_line(colour = NA, size = 0.25),
+              # axis.line = element_line(colour = "black", size = 0.3, inherit.blank = FALSE),
+              axis.line.y = element_blank(),
+              axis.title = element_text(hjust = 0.5),
+              legend.key = element_rect(fill = "white", colour = NA), 
+              strip.background = element_rect(fill = "grey70", colour = NA),
+              strip.text = element_text(colour = "white", size = rel(0.8)),
+              plot.subtitle = element_text(colour = "gray70", family = "Garamond"),
+              plot.background = element_rect(fill = "gray80", color = NA),
+              # plot.text = element_text(size = 12),
+              title = element_text(colour = col_title, size = 16, hjust = 0, family = "Garamond"),
+              # aspect.ratio = 9/18,
+              complete = FALSE)
+}
+
+
+```
+
+
+
+
+
+
+```{r, include=FALSE, echo = FALSE}
+
+# Flytja inn gögn ---------------------------------------------------------
+survey <- read_csv("behavior_and_attitudes.csv", skip = 1)
+framework <- read_csv("entrepreneurial framework conditions.csv", skip = 1)
+
+framework %>% filter(economy == "Iceland")
+framework %>% names
+survey %>% filter(economy == "Iceland")
+```
+
+
+
+
+```{r, include=FALSE, echo = FALSE, echo=FALSE, fig.width = 6.25, fig.height=10}
+# Hreinsa -----------------------------------------------------------------
+
+framework <- framework %>% 
+    group_by(code, economy) %>% 
+    arrange(year) %>% 
+    filter(year == last(year)) %>% 
+    ungroup %>% 
+    mutate(Iceland = if_else(economy != "Iceland", "Nei", "Já"),
+           economy = paste0(economy, " (", year,")"))
+
+survey <- survey %>% 
+    group_by(code, economy) %>% 
+    arrange(year) %>% 
+    filter(year == last(year)) %>% 
+    ungroup %>% 
+    mutate(Iceland = if_else(economy != "Iceland", "Nei", "Já"),
+           economy = paste0(economy, " (", year,")"))
+
+```
+
+ 
+
+
+# Myndir 
+
+
+```{r, echo = FALSE, echo=FALSE, fig.width = 10, fig.height = 16, dpi = 300}
+
+# framework %>% 
+#     left_join(survey) %>% 
+#     gather(variable, value, -code, -economy, -year, -Iceland) %>% 
+#     group_by(variable) %>%
+#     mutate(rank = min_rank(value),
+#            n = n(),
+#            label_text = paste(rank, " / ", n),
+#            y_label = if_else(rank < 60, rank + 5, rank - 55)) %>% 
+#     arrange(year) %>% 
+#     filter(economy %>% str_detect("Iceland"),
+#            !is.na(value)) %>% 
+#     ggplot(aes(x = fct_reorder(variable, rank), y = rank)) +
+#     geom_col() +
+#     geom_text(aes(label = label_text, y = y_label), color = intellecon_pal_discrete[1],
+#               angle = 90, size = 3, hjust = 0) +
+#     theme_intellecon() %+replace%
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1)) +
+#     labs(x = "Breyta", y = "Raðtala / Sæti")
+
+
+framework %>% 
+    filter(!is.na(`Governmental support and policies`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Governmental support and policies`), y = `Governmental support and policies`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+    
+framework %>% 
+    filter(!is.na(`Governmental programs`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Governmental programs`),
+               y = `Governmental programs`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`Post school entrepreneurial education and training`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Post school entrepreneurial education and training`),
+               y = `Post school entrepreneurial education and training`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`Commercial and professional infrastructure`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Commercial and professional infrastructure`),
+               y = `Commercial and professional infrastructure`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`Internal market openness`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Internal market openness`),
+               y = `Internal market openness`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`Cultural and social norms`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Cultural and social norms`),
+               y = `Cultural and social norms`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+
+
+framework %>% 
+    filter(!is.na(`Financing for entrepreneurs`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Financing for entrepreneurs`),
+               y = `Financing for entrepreneurs`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`Taxes and bureaucracy`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Taxes and bureaucracy`),
+               y = `Taxes and bureaucracy`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`Basic school entrepreneurial education and training`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Basic school entrepreneurial education and training`),
+               y = `Basic school entrepreneurial education and training`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`R&D transfer`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`R&D transfer`),
+               y = `R&D transfer`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`Internal market dynamics`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Internal market dynamics`),
+               y = `Internal market dynamics`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+framework %>% 
+    filter(!is.na(`Physical and services infrastructure`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Physical and services infrastructure`),
+               y = `Physical and services infrastructure`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+
+
+
+
+
+
+survey %>% 
+    filter(!is.na(`Entrepreneurship as a Good Career Choice`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`Entrepreneurship as a Good Career Choice`),
+               y = `Entrepreneurship as a Good Career Choice`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+
+survey %>% 
+    filter(!is.na(`High Job Creation Expectation`)) %>% 
+    ggplot(aes(x = fct_reorder(economy, -`High Job Creation Expectation`), y = `High Job Creation Expectation`,
+               fill = Iceland)) +
+    geom_col() +
+    labs(x = "Land (Ár)") +
+    scale_fill_manual(values = intellecon_pal_discrete) +
+    theme_intellecon() %+replace%
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    coord_flip()
+    
+
+
+
+
+```
+

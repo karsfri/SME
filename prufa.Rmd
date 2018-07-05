@@ -1,0 +1,208 @@
+---
+title: "SME"
+author: "Magnús Árni Skúlason og Kári S Friðriksson"
+
+output: word_document
+---
+
+
+
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(magrittr)
+library(forcats)
+relevel_bil <- function(x) {
+    x  %>% mutate(BIL = fct_relevel(BIL, "0-10", "10-50", "50-100", "100-250", "250-500", "500-1000", ">1000")) %>% 
+        dplyr::rename(n = `COUNT(MAXNUM1.TEKJUAR)`)
+}
+
+# Lesa inn
+
+
+df_postnr <- readxl::read_xlsx("2018_04_27_RECONOMICS2_TOFLUR.xlsx", sheet = "POSTNUMER") %>% relevel_bil()
+df_svaedi <- readxl::read_xlsx("2018_04_27_RECONOMICS2_TOFLUR.xlsx", sheet = "SVÆÐIBIL") %>% relevel_bil()
+df_bil <- readxl::read_xlsx("2018_04_27_RECONOMICS2_TOFLUR.xlsx", sheet = "BIL") %>% relevel_bil()
+df_svaedi_allt <- readxl::read_xlsx("2018_04_27_RECONOMICS2_TOFLUR.xlsx", sheet = "SVAEDI1") %>% 
+    dplyr::rename(n = `COUNT(MAXNUM1.TEKJUAR)`)
+
+
+isat_count <- readxl::read_xlsx("2018_05_04_RECONOMICS_ISAT.xlsx", sheet = "isat", range = "B6:L28")
+isat_svaedi <- readxl::read_xlsx("2018_05_04_RECONOMICS_ISAT.xlsx", sheet = "Sheet1")  %>% 
+    dplyr::rename(n = `COUNT(MAXNUM1.TEKJUAR)`)
+isat_balkur <- readxl::read_xlsx("2018_05_04_RECONOMICS_ISAT.xlsx", sheet = "Sheet4") %>% relevel_bil()
+
+vextir_a_skuldabref <- read_csv("vextir_a_skuldabref.csv") %>% 
+    dplyr::mutate(TEKJUAR = TIME, vextir_a_skuldabref = Value / 100) %>% 
+    dplyr::select(TEKJUAR, vextir_a_skuldabref)
+
+
+theme_intellecon <- function(){
+    require(extrafont)
+    col_title <- "#6E1704"
+    theme_grey() %+replace% 
+        theme(legend.direction = "horizontal",
+              legend.position = "bottom",
+              legend.background = element_rect(color = NA, fill = NA),
+              panel.background = element_rect(fill = NA, colour = NA), 
+              panel.border = element_rect(fill = NA, colour = NA), 
+              panel.grid.major.y = element_line(colour = "white"),
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor.x = element_blank(), 
+              panel.spacing = unit(0, "lines"),
+              axis.ticks = element_line(colour = NA, size = 0.25),
+              # axis.line = element_line(colour = "black", size = 0.3, inherit.blank = FALSE),
+              axis.line.y = element_blank(),
+              axis.title = element_text(hjust = 0.5),
+              legend.key = element_rect(fill = "white", colour = NA), 
+              strip.background = element_rect(fill = "grey70", colour = NA),
+              strip.text = element_text(colour = "white", size = rel(0.8)),
+              plot.subtitle = element_text(colour = "gray70", family = "Garamond"),
+              plot.background = element_rect(fill = "gray80", color = NA),
+              title = element_text(colour = col_title, size = 16, hjust = 0, family = "Garamond"),
+              # aspect.ratio = 9/18,
+              complete = FALSE)
+}
+
+intellecon_pal_discrete <- c(
+    "#E69F00",  # Gull,
+    "#6E1704", # Vínrauður
+    "#999999",   # Grár)
+    "#56B4E9",  # Ljósblár
+    "#77AB43"
+) 
+
+scale_fill_intellecon <- list(scale_fill_manual(values = intellecon_pal_discrete))
+
+
+
+# update_geom_defaults("boxplot", list(fill = intellecon_pal_discrete[1]))
+# update_geom_defaults("boxplot", list(outlier.colour = intellecon_pal_discrete[2]))
+# update_geom_defaults("col", list(fill = intellecon_pal_discrete[1]))
+# update_geom_defaults("bar", list(fill = intellecon_pal_discrete[1]))
+# update_geom_defaults("line", list(colour = intellecon_pal_discrete[2]))
+# update_geom_defaults("fill", list(colour = intellecon_pal_discrete[2]))
+```
+
+```{r plots, echo=FALSE, fig.width = 6.25, fig.height = 10}
+add_kt <- function(x){
+    x %>% mutate(    
+        # Arðsemi eigin fjár (e.return on equity,ROE) = Hagnaður ⁄ Meðalstaða eigin fjár
+        roe = HAGNADUR_TAP_ARSREIKN / EIGID_FE_SAMTALS,
+        # Arðsemi heildareigna (e.return on assets,ROA) = Hagnaður ⁄ (Meðalstaða eigna)
+        ROA = HAGNADUR_TAP_ARSREIKN / EIGNIR_SAMTALS,
+        # Hagnaðarhlutfall (e.profit margin) = Hagnaður ⁄ Sala
+        sala = (VSK_SKYLD_SALA_SAMT + VELTA_UNDANTHEGIN_VSK),
+        profit_margin = HAGNADUR_TAP_ARSREIKN / sala,
+        # Brúttó ágóða hlutfall (e.gross profit margin) = (Brúttó ágóði) ⁄ Sala
+        gross_margin = (sala - SOLUKOSTNADUR) / sala,
+        # Arðgreiðsluhlutfall (e.payout ratio) = Arður ⁄ Hagnaður
+        UTHLUTADUR_ARDUR / HAGNADUR_TAP_ARSREIKN,
+        # Arðgreiðsluhlutfall (e.payout ratio) = Arður ⁄ Hagnaður
+        payout_ratio = UTHLUTADUR_ARDUR / HAGNADUR_TAP_ARSREIKN,
+        
+        ### Greiðsluhæfi ###
+        
+        # Veltufjárhlutfall (e.current ratio) = Veltufjármunir ⁄ Skammtímaskuldir
+        veltufjarmunir = INNEIGN_VIRDISAUKASKATTS + VERDBREF + HANDB_FE,
+        skammtimaskuldir = ADRAR_SKAMMTIMASK + OGREIDDUR_VSK + NAESTA_ARS_AFB_LANGTIMALAN+
+            VIDSKIPTASKULDIR + ERLENDAR_SKAMMTIMASK + ADR_FYRIRFRAM_INNH_TEKJUR,
+        current_ratio  = veltufjarmunir / skammtimaskuldir,
+        # Lausafjárhlutfall (e.quick ratio,acid-test) = (Kvikir veltufjármunir) ⁄ Skammtímaskuldir
+        # Kvikir veltufjármunir = Veltufjármunir – Vörubirgðir
+        quick_ratio = (veltufjarmunir - BIRGDIR_FULLUNN_VARA) / skammtimaskuldir,
+        # Hlutfall handbærs fjár (e.cash ratio) =(Handbært fé + skammtímaverðbréf) / Skammtímaskuldir
+        # cash_ratio = HANDB_FE + 
+        
+        # Sjóðstreymi á móti skammtímaskuldum 
+        # (e.current cash debt coverage ratio) =(Handbært fé frá rekstri) ⁄ (Meðalstaða skammtímaskulda)
+        current_cash_dept_coverage_ratio = HANDB_FE / skammtimaskuldir,
+        # Gæði hagnaðar (e.quality of earnings) = (Handbært fé frá rekstri) ⁄ Hagnaður
+        quality_of_earnings = HANDB_FE / HAGNADUR_TAP_ARSREIKN,
+        
+        ### Skuldsetningarhlutföll (e. coverage ratios) ###
+        
+        # Hlutfall skulda á móti eignum (e.debt to assets ratio) = Heildarskuldir ⁄ Heildareignir
+        dept_asset_ratio = SKULDIR_SAMTALS / EIGNIR_SAMTALS,
+        # Eiginfjárhlutfall (e.equity ratio) = (Eigið fé) ⁄ Heildareignir
+        equity_ratio = EIGID_FE_SAMTALS / EIGNIR_SAMTALS,
+        # Vaxtaþekja (e.times interest earned,TIE) = (Rekstrarhagnaður (EBIT)) ⁄ Vaxtagjöld
+        tie = REKSTRARTEK_MIN_REKSTRARGJ / VAXTAGJOLD,
+        # Skuldaþekja handbærs fjár frá rekstri 
+        # (e.cash debt coverage ratio) = (Handbært fé frá rekstri) ⁄ (Meðalstaða heildarskulda)
+        cash_debt_coverage_ratio = HANDB_FE / SKULDIR_SAMTALS
+        # Veltuhraði birgða (e.inventory turnover ratio) = (Kostnaðarverð seldra vara) ⁄ Meðalstaða birgða
+        # Ekki hægt!!!!!!!!!                          
+        )
+    
+}
+
+my_kennitalas <- c("roe", "ROA", "profit_margin", "gross_margin", "payout_ratio", 
+                   "current_ratio", "quick_ratio", 
+                   "current_cash_dept_coverage_ratio", "quality_of_earnings", "dept_asset_ratio", 
+                   "equity_ratio", "tie", "cash_debt_coverage_ratio")
+
+my_titles <- c("roe" = "Arðsemi eigin fjár (e.return on equity,ROE)",
+            "ROA" = "Arðsemi heildareigna (e.return on assets,ROA)",
+            "profit_margin" = "Hagnaðarhlutfall (e.profit margin)",
+            "gross_margin" = "Brúttó ágóða hlutfall (e.gross profit margin)",
+            "payout_ratio" = "Arðgreiðsluhlutfall (e.payout ratio)",
+            "current_ratio" = "veltufjarmunir / skammtimaskuldir",
+            "quick_ratio" = "Lausafjárhlutfall (e.quick ratio,acid-test)",
+            "current_cash_dept_coverage_ratio" = "Sjóðstreymi á móti skammtímaskuldum",
+            "quality_of_earnings" = "Gæði hagnaðar (e.quality of earnings)",
+            "dept_asset_ratio" = "Hlutfall skulda á móti eignum (e.debt to assets ratio)",
+            "equity_ratio" = "Eiginfjárhlutfall (e.equity ratio)",
+            "tie" = "Vaxtaþekja (e.times interest earned,TIE)",
+            "cash_debt_coverage_ratio" = "Skuldaþekja handbærs fjár frá rekstri")
+
+
+wrapit <- function(text) {
+    wtext <- paste(strwrap(text,width=40), collapse = " \n ")
+    return(wtext)
+}
+
+
+change_label <- function(text){
+    sprintf("%0.2f", round(text, digits = 2))
+}
+
+plot_kennitala <- function(df, x_var, y_var, facet_var){
+    
+    ylimits <- df[y_var] %>% as.data.frame() %>% quantile(c(0.1, 0.9), na.rm = TRUE)
+    label_loc <- ylimits[1] + 0.1 * (ylimits[2] - ylimits[1])
+
+    df %>% 
+        filter(roe != 0) %>% 
+        mutate(my_label = change_label(roe)) %>%
+        ggplot(aes_string(x = x_var, y = y_var), fill = intellecon_pal_discrete[2]) +
+        geom_col(position = "dodge", fill = intellecon_pal_discrete[2]) +
+        coord_cartesian(ylim = ylimits) +
+        # geom_text(aes(label = my_label), y = label_loc, size = 2, color = intellecon_pal_discrete[1]) +
+        facet_wrap(as.formula(paste("~", facet_var)), ncol = 3) +
+        theme_intellecon() +
+        list(theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 1),
+                   text = element_text(size = 7))) +
+        labs(title = my_titles[y_var])
+}
+
+
+
+
+
+isat_svaedi <- isat_svaedi %>% 
+    add_kt 
+
+
+for(kt in my_kennitalas){
+    isat_svaedi %>% 
+        filter(TEKJUAR == 2017) %>% 
+        group_by(ISAT2008_BALKURLYSING) %>% 
+        mutate(isat = wrapit(first(ISAT2008_BALKURLYSING))) %>% ungroup %>% 
+        plot_kennitala("SVAEDI", kt, "isat") %>% 
+        print()
+}
+     
+```
+
